@@ -1,3 +1,5 @@
+import type * as Leaflet from "leaflet";
+
 type BBox = {
   west: number;
   south: number;
@@ -100,6 +102,8 @@ declare global {
   }
 }
 
+declare const L: typeof Leaflet;
+
 const report = window.CSMAP_PROJ_REPORT;
 
 const state = {
@@ -134,6 +138,17 @@ const elements = {
   liveResult: must<HTMLElement>("#live-result"),
   runLive: must<HTMLButtonElement>("#run-live"),
 };
+
+type ExtentMapConfig = {
+  id: string;
+  summaryId: string;
+  label: string;
+  csmap?: BBox;
+  proj?: BBox;
+};
+
+const pendingExtentMaps: ExtentMapConfig[] = [];
+let extentMapSerial = 0;
 
 function must<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -290,6 +305,7 @@ function coordinateMaxByUnit(cases: CoordinateCase[]): string {
 }
 
 function renderCases(): void {
+  pendingExtentMaps.length = 0;
   const entries = filteredItems();
   if (entries.length === 0) {
     elements.caseList.innerHTML = `<div class="empty">No cases match the current filter.</div>`;
@@ -299,6 +315,7 @@ function renderCases(): void {
   elements.caseList.innerHTML = entries
     .map((entry) => (entry.type === "extent" ? extentCard(entry.item as ExtentCase) : coordinateCard(entry.item as CoordinateCase)))
     .join("");
+  hydrateExtentMaps();
 }
 
 function coordinateCard(item: CoordinateCase): string {
@@ -353,7 +370,7 @@ function extentCard(item: ExtentCase): string {
         <span class="status ${cssStatusClass(item.status)}">${escapeHtml(statusLabel(item.status, "extent"))}</span>
       </div>
       <div>
-        ${extentSvg(item.csmap, item.proj)}
+        ${extentMap(item.csmap, item.proj, `${titleize(item.name)} extent comparison`)}
         ${bboxTable(item)}
       </div>
     </article>
@@ -386,146 +403,101 @@ function bboxTable(item: ExtentCase): string {
   `;
 }
 
-function extentSvg(csmap: BBox | undefined, proj: BBox | undefined): string {
-  const width = 720;
-  const height = 320;
-  const rects = [
-    { bbox: csmap, className: "csmap-rect" },
-    { bbox: proj, className: "proj-rect" },
-  ];
-  const grid: string[] = [];
-  for (let lon = -120; lon <= 120; lon += 60) {
-    const x = projectX(lon, width);
-    grid.push(`<line class="graticule" x1="${x}" y1="0" x2="${x}" y2="${height}" />`);
-  }
-  for (let lat = -60; lat <= 60; lat += 30) {
-    const y = projectY(lat, height);
-    grid.push(`<line class="graticule" x1="0" y1="${y}" x2="${width}" y2="${y}" />`);
-  }
-
+function extentMap(csmap: BBox | undefined, proj: BBox | undefined, label: string): string {
+  const id = `extent-map-${++extentMapSerial}`;
+  const summaryId = `${id}-summary`;
+  pendingExtentMaps.push({ id, summaryId, label, csmap, proj });
   return `
     <div class="extent-visual">
-      <svg class="extent-map" viewBox="0 0 ${width} ${height}" role="img" aria-label="Extent bbox comparison map with approximate land basemap">
-        <rect class="world" x="0" y="0" width="${width}" height="${height}" />
-        ${worldLandPaths(width, height)}
-        ${grid.join("")}
-        ${rects.map(({ bbox, className }) => bboxRect(bbox, className, width, height)).join("")}
-      </svg>
-      <p class="map-unit-note">extent overlay uses longitude/latitude degrees</p>
+      <div class="extent-map" id="${id}" role="region" aria-label="${escapeHtml(label)}" aria-describedby="${summaryId}"></div>
+      <p class="map-unit-note" id="${summaryId}">Extent overlay uses longitude/latitude degrees; exact bbox values are in the table.</p>
     </div>
   `;
 }
 
-const worldLandPolygons: Array<Array<[number, number]>> = [
-  [
-    [-168, 72],
-    [-140, 70],
-    [-128, 56],
-    [-112, 50],
-    [-96, 49],
-    [-82, 42],
-    [-68, 46],
-    [-54, 58],
-    [-62, 70],
-    [-96, 76],
-    [-132, 74],
-  ],
-  [
-    [-83, 30],
-    [-72, 23],
-    [-78, 9],
-    [-64, -4],
-    [-54, -18],
-    [-60, -38],
-    [-72, -55],
-    [-81, -38],
-    [-79, -14],
-    [-88, 8],
-  ],
-  [
-    [-52, 60],
-    [-38, 70],
-    [-24, 76],
-    [-18, 66],
-    [-30, 58],
-  ],
-  [
-    [-18, 36],
-    [0, 57],
-    [34, 58],
-    [48, 42],
-    [43, 12],
-    [32, -34],
-    [18, -35],
-    [6, -18],
-    [-10, 4],
-    [-18, 24],
-  ],
-  [
-    [-10, 36],
-    [12, 46],
-    [40, 45],
-    [76, 56],
-    [112, 48],
-    [150, 60],
-    [168, 52],
-    [146, 30],
-    [118, 24],
-    [102, 8],
-    [72, 8],
-    [50, 24],
-    [30, 30],
-    [10, 36],
-  ],
-  [
-    [112, -10],
-    [154, -10],
-    [154, -40],
-    [132, -44],
-    [112, -28],
-  ],
-  [
-    [-180, -62],
-    [180, -62],
-    [180, -84],
-    [-180, -84],
-  ],
-];
-
-function worldLandPaths(width: number, height: number): string {
-  return worldLandPolygons.map((points) => `<path class="land" d="${polygonPath(points, width, height)}" />`).join("");
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
-function polygonPath(points: Array<[number, number]>, width: number, height: number): string {
-  return points
-    .map(([lon, lat], index) => `${index === 0 ? "M" : "L"} ${projectX(lon, width)} ${projectY(lat, height)}`)
-    .join(" ")
-    .concat(" Z");
+function hydrateExtentMaps(): void {
+  const maps = pendingExtentMaps.splice(0);
+  for (const config of maps) {
+    renderLeafletExtentMap(config);
+  }
 }
 
-function bboxRect(bbox: BBox | undefined, className: string, width: number, height: number): string {
-  if (!bbox) return "";
+function renderLeafletExtentMap(config: ExtentMapConfig): void {
+  const container = document.getElementById(config.id);
+  if (!container) return;
+
+  if (typeof L === "undefined") {
+    container.textContent = "Map library failed to load.";
+    container.classList.add("map-load-error");
+    return;
+  }
+
+  const map = L.map(container, {
+    attributionControl: true,
+    keyboard: true,
+    preferCanvas: true,
+    scrollWheelZoom: false,
+    zoomControl: true,
+  });
+
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    detectRetina: true,
+    maxZoom: 19,
+    updateWhenIdle: true,
+  }).addTo(map);
+
+  const overlays = L.featureGroup().addTo(map);
+  addExtentRectangle(overlays, config.csmap, "CS-MAP extent", {
+    color: "#1d6f73",
+    fillColor: "#1d6f73",
+    fillOpacity: 0.16,
+    weight: 2,
+  });
+  addExtentRectangle(overlays, config.proj, "PROJ extent", {
+    color: "#b33d2e",
+    dashArray: "6 5",
+    fillColor: "#b33d2e",
+    fillOpacity: 0.16,
+    weight: 2,
+  });
+
+  const bounds = overlays.getBounds();
+  if (bounds.isValid()) {
+    map.fitBounds(bounds.pad(0.15), { animate: false, maxZoom: 9 });
+  } else {
+    map.setView([20, 0], 1);
+  }
+
+  requestAnimationFrame(() => map.invalidateSize());
+}
+
+function addExtentRectangle(
+  group: Leaflet.FeatureGroup,
+  bbox: BBox | undefined,
+  label: string,
+  style: Leaflet.PathOptions,
+): void {
+  const bounds = bboxBounds(bbox);
+  if (!bounds) return;
+
+  L.rectangle(bounds, style).bindTooltip(label, { sticky: true }).addTo(group);
+}
+
+function bboxBounds(bbox: BBox | undefined): Leaflet.LatLngBounds | undefined {
+  if (!bbox) return undefined;
+
   const west = clamp(bbox.west, -180, 180);
   const east = clamp(bbox.east, -180, 180);
   const south = clamp(bbox.south, -90, 90);
   const north = clamp(bbox.north, -90, 90);
-  const x = projectX(west, width);
-  const y = projectY(north, height);
-  const w = Math.max(1, projectX(east, width) - x);
-  const h = Math.max(1, projectY(south, height) - y);
-  return `<rect class="${className}" x="${x}" y="${y}" width="${w}" height="${h}" />`;
-}
+  if (east <= west || north <= south) return undefined;
 
-function projectX(lon: number, width: number): number {
-  return ((lon + 180) / 360) * width;
-}
-
-function projectY(lat: number, height: number): number {
-  return ((90 - lat) / 180) * height;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
+  return L.latLngBounds([south, west], [north, east]);
 }
 
 async function loadCrsCatalog(): Promise<void> {
@@ -717,6 +689,7 @@ function renderLiveResult(result: LiveCompareResult): void {
     elements.liveResult.innerHTML = liveError(result.fatal);
     return;
   }
+  pendingExtentMaps.length = 0;
 
   const csmapOk = result.csmap?.ok === true;
   const projOk = result.proj?.ok === true;
@@ -744,6 +717,7 @@ function renderLiveResult(result: LiveCompareResult): void {
       ${liveExtentBlock(result.targetExtent)}
     </article>
   `;
+  hydrateExtentMaps();
 }
 
 function liveStatusNote(status: string, result: LiveCompareResult, outputUnit: string): string {
@@ -775,7 +749,7 @@ function liveExtentBlock(extent: LiveCompareResult["targetExtent"]): string {
   }
   return `
     <div class="live-extent">
-      ${extentSvg(extent.csmap, extent.proj)}
+      ${extentMap(extent.csmap, extent.proj, "Live target extent comparison")}
       <table class="bbox-grid">
         <caption>Target extent bbox edges, deg</caption>
         <thead>

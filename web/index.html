@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>CS-MAP vs PROJ</title>
     <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/vendor/leaflet/leaflet.css" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -46,7 +47,7 @@
           <input id="search" class="search" type="search" autocomplete="off" />
         </div>
         <div class="legend" aria-label="Legend">
-          <div><span class="swatch land"></span>approximate land context</div>
+          <div><span class="swatch land"></span>OpenStreetMap basemap</div>
           <div><span class="swatch csmap"></span>CS-MAP extent bbox</div>
           <div><span class="swatch proj"></span>PROJ extent bbox</div>
           <div><span class="swatch delta"></span>bbox edge delta, deg</div>
@@ -106,6 +107,7 @@
     </main>
 
     <script src="report.js"></script>
+    <script src="/vendor/leaflet/leaflet.js"></script>
     <script type="module" src="dist/app.js"></script>
   </body>
 </html>

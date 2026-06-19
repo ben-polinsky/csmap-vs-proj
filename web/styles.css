@@ -188,11 +188,14 @@ h1 {
 }
 
 .swatch.land {
-  background: rgba(104, 107, 97, 0.18);
+  background:
+    linear-gradient(135deg, rgba(104, 107, 97, 0.2) 25%, transparent 25% 50%, rgba(29, 111, 115, 0.16) 50% 75%, transparent 75%),
+    #eef1ec;
   color: var(--muted);
 }
 
 .workspace {
+  min-width: 0;
   padding: 22px 28px 38px;
 }
 
@@ -292,6 +295,7 @@ h1 {
 }
 
 .live-result {
+  min-width: 0;
   margin-top: 16px;
 }
 
@@ -315,6 +319,7 @@ h1 {
 .live-output {
   display: grid;
   gap: 14px;
+  min-width: 0;
 }
 
 .live-output.diff .delta-card {
@@ -348,6 +353,8 @@ h1 {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+  width: 100%;
+  min-width: 0;
 }
 
 .coord-card {
@@ -423,10 +430,12 @@ h1 {
 
 .live-extent {
   display: grid;
-  grid-template-columns: minmax(260px, 720px) minmax(260px, 460px);
+  grid-template-columns: minmax(0, 720px) minmax(0, 460px);
   gap: 14px;
   align-items: start;
   justify-content: start;
+  width: 100%;
+  min-width: 0;
 }
 
 .live-extent .case-note {
@@ -471,17 +480,23 @@ h1 {
 .case-list {
   display: grid;
   gap: 14px;
+  min-width: 0;
 }
 
 .case-card {
   display: grid;
-  grid-template-columns: minmax(270px, 380px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
   gap: 18px;
   padding: 18px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
   box-shadow: var(--shadow);
+  min-width: 0;
+}
+
+.case-card > div {
+  min-width: 0;
 }
 
 .case-card.extent.different {
@@ -544,41 +559,41 @@ h1 {
 .extent-visual {
   width: 100%;
   max-width: 720px;
+  min-width: 0;
 }
 
 .extent-map {
   width: 100%;
+  max-width: 100%;
+  min-height: 280px;
   aspect-ratio: 2.2 / 1;
   border: 1px solid var(--line);
   background: #eef1ec;
+  z-index: 0;
 }
 
-.extent-map .graticule {
-  stroke: rgba(31, 33, 28, 0.16);
-  stroke-width: 0.5;
+.extent-map.leaflet-container {
+  color: var(--ink);
+  font-family: "Avenir Next", "Gill Sans", "Segoe UI", sans-serif;
 }
 
-.extent-map .land {
-  fill: rgba(104, 107, 97, 0.15);
-  stroke: rgba(104, 107, 97, 0.38);
-  stroke-width: 0.8;
+.extent-map .leaflet-control-attribution,
+.extent-map .leaflet-control-zoom a {
+  border-color: var(--line);
+  color: var(--ink);
 }
 
-.extent-map .csmap-rect {
-  fill: rgba(29, 111, 115, 0.16);
-  stroke: var(--csmap);
-  stroke-width: 1.6;
+.extent-map .leaflet-control-attribution {
+  font-size: 10px;
 }
 
-.extent-map .proj-rect {
-  fill: rgba(179, 61, 46, 0.18);
-  stroke: var(--proj);
-  stroke-width: 1.6;
-}
-
-.extent-map .world {
-  fill: rgba(255, 255, 255, 0.52);
-  stroke: rgba(31, 33, 28, 0.28);
+.map-load-error {
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  color: var(--fail);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
 }
 
 .map-unit-note {
@@ -591,7 +606,10 @@ h1 {
 
 .bbox-grid,
 .sample-table {
+  display: block;
   width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
   border-collapse: collapse;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;

@@ -10,6 +10,7 @@ Small comparison harness for getting CS-MAP and PROJ running side by side.
 - `src/live_compare.cpp`: JSON-emitting native runner used by the live web API.
 - `server/server.ts`: local TypeScript HTTP server for the web app and comparison API.
 - `web/app.ts`: TypeScript browser app for report filtering and ad hoc CRS comparisons.
+- `package.json`: npm-managed TypeScript toolchain plus the Leaflet browser map dependency.
 - `Makefile`: top-level build and run targets.
 
 ## Quick start
@@ -49,12 +50,14 @@ make app
 make serve
 ```
 
-`make app` regenerates `web/report.js`, builds `bin/live_compare`, and compiles the TypeScript server/client. `make serve` hosts the app and live API at `http://127.0.0.1:4173`.
+`make app` installs npm dependencies as needed, regenerates `web/report.js`, builds `bin/live_compare`, and compiles the TypeScript server/client. `make serve` hosts the app and live API at `http://127.0.0.1:4173`.
 
 The live app exposes:
 
 - `GET /api/crs`: CS-MAP CRS catalog parsed from `coordsys.asc`.
 - `POST /api/compare`: runs CS-MAP and PROJ against the supplied source/target CRS and coordinate, then returns raw coordinate deltas and target extent differences. The request can provide `sourceEpsg` and `targetEpsg`; the server resolves those to the best non-legacy CS-MAP CRS names it can find in the vendored dictionary and uses `EPSG:<code>` for PROJ. Explicit `sourceCsmap`, `targetCsmap`, `sourceProj`, and `targetProj` values still override the resolved defaults.
+
+Extent comparisons render with Leaflet and OpenStreetMap tiles, while the adjacent bbox tables remain the exact data source for CS-MAP and PROJ edge values.
 
 ## Test plan
 

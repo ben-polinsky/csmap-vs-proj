@@ -29,6 +29,7 @@ type CompareRequest = {
 
 const rootDir = path.resolve(__dirname, "../..");
 const webDir = path.join(rootDir, "web");
+const leafletDir = path.join(rootDir, "node_modules/leaflet/dist");
 const csmapDictDir = path.join(rootDir, "vendor/csmap/CsMapDev/Dictionaries");
 const coordsysPath = path.join(csmapDictDir, "coordsys.asc");
 const liveComparePath = path.join(rootDir, "bin/live_compare");
@@ -41,6 +42,7 @@ const contentTypes: Record<string, string> = {
   ".js": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".map": "application/json; charset=utf-8",
+  ".png": "image/png",
   ".svg": "image/svg+xml",
 };
 
@@ -348,7 +350,16 @@ function parseNativeJson(stdout: string): unknown {
 }
 
 async function serveStatic(response: ServerResponse, pathname: string): Promise<void> {
+  if (pathname.startsWith("/vendor/leaflet/")) {
+    await serveStaticFrom(response, leafletDir, pathname.slice("/vendor/leaflet".length));
+    return;
+  }
+
   const routePath = pathname === "/" ? "/index.html" : pathname;
+  await serveStaticFrom(response, webDir, routePath);
+}
+
+async function serveStaticFrom(response: ServerResponse, baseDir: string, routePath: string): Promise<void> {
   let decodedPath: string;
   try {
     decodedPath = decodeURIComponent(routePath);
@@ -357,8 +368,8 @@ async function serveStatic(response: ServerResponse, pathname: string): Promise<
     return;
   }
 
-  const filePath = path.resolve(webDir, `.${decodedPath}`);
-  if (!filePath.startsWith(`${webDir}${path.sep}`) && filePath !== webDir) {
+  const filePath = path.resolve(baseDir, `.${decodedPath}`);
+  if (!filePath.startsWith(`${baseDir}${path.sep}`) && filePath !== baseDir) {
     sendText(response, 403, "forbidden");
     return;
   }
