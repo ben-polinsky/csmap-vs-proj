@@ -38,7 +38,13 @@ That runs CS-MAP's bundled quick test, verifies PROJ can resolve `EPSG:3857`, an
 
 The browser path is the default live comparison engine. The app loads CS-MAP and PROJ in a Web Worker, preloads the core CS-MAP/PROJ resources, and fetches large grid/data files from the generated manifest only when a transform needs them. The native `/api/compare` route stays available as an oracle and fallback.
 
-The verified local Emscripten setup is repo-local and ignored:
+### Do you need to run WASM setup?
+
+For the native baseline only, no. `make bootstrap`, `make test`, `make app`, and `make serve` can run without building the browser WASM runtime. In that mode the local server still exposes the native `/api/compare` oracle.
+
+For browser-native WASM parity, yes, once per checkout or worktree. The Emscripten toolchain and generated WASM/data artifacts are intentionally ignored, so a fresh clone or fresh worktree will not have them. If `wasm/vendor/emsdk` and `web/wasm/compare-runtime.js` already exist, you do not need to reinstall emsdk; start at `make wasm-toolchain-check` or `make wasm`.
+
+`make wasm-toolchain-check` only verifies and activates an existing toolchain. It does not install emsdk. Install the repo-local toolchain only when that check fails or `wasm/vendor/emsdk` is missing:
 
 ```sh
 git clone https://github.com/emscripten-core/emsdk.git wasm/vendor/emsdk
@@ -49,17 +55,24 @@ brew install cmake
 
 The current local install resolves `latest` to Emscripten `6.0.0`. The build scripts also look for an already-active `EMSDK` or nearby `emsdk` checkout before failing.
 
-Use the WASM targets:
+After setup, build the browser artifacts:
 
 ```sh
 make wasm-toolchain-check
 make wasm
 make wasm-test
+```
+
+Then build and serve the app:
+
+```sh
 make app
 make serve
 ```
 
 `make wasm` builds PROJ `9.8.1` from source for Emscripten, builds CS-MAP as a WASM static archive, materializes the browser data manifest, and writes the runtime to `web/wasm/compare-runtime.js`. `make wasm-test` verifies the expected WASM, CS-MAP, PROJ, and manifest artifacts exist.
+
+`make app` does not rebuild `web/wasm/compare-runtime.js`; rerun `make wasm` after C++ comparison-core changes, WASM build-script changes, or data-policy changes. If the WASM artifacts are missing, the browser worker can fall back to native `/api/compare`, but that is not the browser parity path.
 
 Generated toolchain, build, runtime, and data outputs are ignored on purpose:
 
