@@ -377,6 +377,7 @@ async function serveStatic(response: ServerResponse, pathname: string): Promise<
     const body = await fs.readFile(filePath);
     response.writeHead(200, {
       ...isolationHeaders,
+      "cache-control": "no-store",
       "content-type": contentTypes[path.extname(filePath)] ?? "application/octet-stream",
       "content-length": body.byteLength,
     });

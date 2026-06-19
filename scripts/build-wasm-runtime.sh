@@ -26,7 +26,7 @@ fi
 
 mkdir -p "$OUT_DIR"
 
-em++ -O3 -std=c++17 -pthread \
+em++ -O3 -std=c++17 -pthread -fexceptions \
   -I"$ROOT/vendor/csmap/CsMapDev/Include" \
   -I"$PROJ_PREFIX/include" \
   "$ROOT/src/compare_core.cpp" \
@@ -37,7 +37,10 @@ em++ -O3 -std=c++17 -pthread \
   -sEXPORT_ES6=1 \
   -sENVIRONMENT=worker \
   -sALLOW_MEMORY_GROWTH=1 \
+  -sDISABLE_EXCEPTION_CATCHING=0 \
   -sFORCE_FILESYSTEM=1 \
+  -sFETCH=1 \
+  -sUSE_SQLITE3=1 \
   -sUSE_PTHREADS=1 \
   -sPTHREAD_POOL_SIZE=2 \
   -sEXPORTED_FUNCTIONS='["_compare_json","_free_result","_malloc","_free"]' \

@@ -16,7 +16,13 @@ OUT_DIR="$WASM_DIR/dist/csmap"
 SHIM_DIR="$WASM_BUILD_DIR/csmap/tool-shims"
 
 mkdir -p "$WASM_BUILD_DIR/csmap" "$OUT_DIR" "$SHIM_DIR"
-ln -sf "$(command -v emar)" "$SHIM_DIR/ar"
+EMAR_BIN="$(command -v emar)"
+rm -f "$SHIM_DIR/ar"
+cat > "$SHIM_DIR/ar" <<EOF
+#!/usr/bin/env bash
+exec "$EMAR_BIN" "\$@"
+EOF
+chmod +x "$SHIM_DIR/ar"
 
 pushd "$CSMAP_DEV/Source" >/dev/null
 PATH="$SHIM_DIR:$PATH" \
@@ -28,9 +34,8 @@ PATH="$SHIM_DIR:$PATH" \
     PROCESSOR=wasm \
     OUT_DIR="$OUT_DIR" \
     INT_DIR="$WASM_BUILD_DIR/csmap/obj" \
-    SRC_DIR="$CSMAP_DEV/Source/" \
     C_FLG="${CSMAP_WASM_CFLAGS:--c -O2 -pthread -I../Include}" \
-    CXX_FLG="${CSMAP_WASM_CXXFLAGS:--c -O2 -pthread -std=c++17 -I../Include}"
+    CXX_FLG="${CSMAP_WASM_CXXFLAGS:--c -O2 -pthread -std=c++14 -I../Include}"
 popd >/dev/null
 
 if [ ! -f "$OUT_DIR/CsMap.a" ]; then

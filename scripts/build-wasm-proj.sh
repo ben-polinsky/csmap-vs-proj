@@ -29,12 +29,27 @@ if [ ! -d "$SRC_DIR" ]; then
   tar -xzf "$SRC_ARCHIVE" -C "$WASM_VENDOR_DIR"
 fi
 
+# PROJ requires SQLite both at configure time and final link time. Emscripten
+# ships SQLite as a port, but CMake will not see it until the port is seeded.
+SQLITE_PROBE="$BUILD_DIR/sqlite-port-probe"
+printf 'int main(void) { return 0; }\n' | emcc -xc - -sUSE_SQLITE3=1 -o "$SQLITE_PROBE.js" >/dev/null
+rm -f "$SQLITE_PROBE.js" "$SQLITE_PROBE.wasm"
+
+SQLITE_INCLUDE="$EMSDK/upstream/emscripten/cache/sysroot/include"
+SQLITE_LIBRARY="$EMSDK/upstream/emscripten/cache/sysroot/lib/wasm32-emscripten/libsqlite3.a"
+if [ ! -f "$SQLITE_INCLUDE/sqlite3.h" ] || [ ! -f "$SQLITE_LIBRARY" ]; then
+  echo "Emscripten SQLite3 port did not produce the expected include/archive." >&2
+  exit 1
+fi
+
 emcmake cmake -S "$SRC_DIR" -B "$BUILD_DIR" \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
   -DCMAKE_C_FLAGS="-pthread" \
   -DCMAKE_CXX_FLAGS="-pthread" \
-  -DCMAKE_EXE_LINKER_FLAGS="-pthread" \
+  -DCMAKE_EXE_LINKER_FLAGS="-pthread -sUSE_SQLITE3=1" \
+  -DSQLite3_INCLUDE_DIR="$SQLITE_INCLUDE" \
+  -DSQLite3_LIBRARY="$SQLITE_LIBRARY" \
   -DBUILD_SHARED_LIBS=OFF \
   -DBUILD_APPS=OFF \
   -DBUILD_TESTING=OFF \

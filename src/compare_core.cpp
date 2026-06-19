@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
+#include <string>
 
 extern "C" {
 #include "cs_map.h"
@@ -82,11 +83,37 @@ void writeJsonBBox(std::ostream& out, const BBox& bbox) {
   out << "}";
 }
 
+std::string datumNameForCsMapCrs(const std::string& crsName) {
+  cs_Csdef_* definition = CS_csdef(crsName.c_str());
+  if (definition == nullptr) return "";
+
+  std::string datumName = definition->dat_knm;
+  CS_free(definition);
+  return datumName;
+}
+
 Coord transformWithCsMap(const CompareOptions& options) {
+  const std::string sourceDatum = datumNameForCsMapCrs(options.csmapSource);
+  const std::string targetDatum = datumNameForCsMapCrs(options.csmapTarget);
   double coord[3] = {options.x, options.y, 0.0};
   int status = CS_cnvrt(options.csmapSource.c_str(), options.csmapTarget.c_str(), coord);
   if (status != 0) {
-    throw std::runtime_error("CS-MAP returned status " + std::to_string(status));
+    char errorMessage[256] = {};
+    CS_errmsg(errorMessage, static_cast<int>(sizeof(errorMessage)));
+
+    std::string message = "CS-MAP returned status " + std::to_string(status);
+    if (errorMessage[0] != '\0') {
+      message += ": ";
+      message += errorMessage;
+    }
+    if (!sourceDatum.empty() || !targetDatum.empty()) {
+      message += " [sourceDatum=";
+      message += sourceDatum.empty() ? "unknown" : sourceDatum;
+      message += " targetDatum=";
+      message += targetDatum.empty() ? "unknown" : targetDatum;
+      message += "]";
+    }
+    throw std::runtime_error(message);
   }
   if (!std::isfinite(coord[0]) || !std::isfinite(coord[1])) {
     throw std::runtime_error("CS-MAP returned a non-finite coordinate");

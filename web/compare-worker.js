@@ -110,14 +110,21 @@ function compareFunction(candidate) {
 }
 
 async function compareWithEmscripten(module, request) {
-  const firstResult = callCompareJson(module, request);
-  const missing = missingResourceText(firstResult);
-  if (!missing) return firstResult;
+  let result = callCompareJson(module, request);
+  const seenMessages = new Set();
 
-  const loaded = await hydrateMissingResource(module, missing);
-  if (!loaded) return firstResult;
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const missing = missingResourceText(result);
+    if (!missing) return result;
+    if (seenMessages.has(missing)) return result;
+    seenMessages.add(missing);
 
-  return callCompareJson(module, request);
+    const loaded = await hydrateMissingResource(module, missing);
+    if (!loaded) return result;
+    result = callCompareJson(module, request);
+  }
+
+  return result;
 }
 
 function callCompareJson(module, request) {
@@ -148,7 +155,9 @@ function missingResourceText(result) {
     .filter(Boolean)
     .join("\n");
 
-  return /missing|not found|no such file|failed to open|could not open|grid/i.test(text) ? text : "";
+  return /missing|not found|no such file|failed to open|could not open|open of .*file .*failed|datum shift data file|grid/i.test(text)
+    ? text
+    : "";
 }
 
 async function hydrateMissingResource(module, message) {
@@ -156,17 +165,21 @@ async function hydrateMissingResource(module, message) {
 
   const manifest = await loadManifest();
   const candidates = lazyManifestEntries(manifest);
-  const match = candidates.find((entry) => resourceMessageMatches(message, entry));
-  if (!match) return false;
+  const matches = matchingResourceEntries(message, candidates);
+  if (matches.length === 0) return false;
 
-  const response = await fetch(match.url);
-  if (!response.ok) return false;
+  let loaded = false;
+  for (const match of matches) {
+    const response = await fetch(match.url);
+    if (!response.ok) continue;
 
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  const virtualPath = `${match.root}/${match.path}`;
-  ensureVirtualDir(module.FS, virtualPath.slice(0, virtualPath.lastIndexOf("/")));
-  module.FS.writeFile(virtualPath, bytes);
-  return true;
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    const virtualPath = `${match.root}/${match.path}`;
+    ensureVirtualDir(module.FS, virtualPath.slice(0, virtualPath.lastIndexOf("/")));
+    module.FS.writeFile(virtualPath, bytes);
+    loaded = true;
+  }
+  return loaded;
 }
 
 function lazyManifestEntries(manifest) {
@@ -178,7 +191,7 @@ function lazyManifestEntries(manifest) {
 
   for (const pack of manifest?.csmap?.lazyGridPacks ?? []) {
     for (const entry of pack.files ?? []) {
-      pushLazyEntry(entries, entry, "/csmap");
+      pushLazyEntry(entries, entry, "/csmap", { packId: pack.id });
     }
   }
 
@@ -189,10 +202,16 @@ function lazyManifestEntries(manifest) {
   return entries;
 }
 
-function pushLazyEntry(entries, entry, root) {
+function pushLazyEntry(entries, entry, root, metadata = {}) {
   const resourcePath = resourcePathForEntry(entry);
   if (!resourcePath || !entry?.url) return;
-  entries.push({ root, path: resourcePath, url: entry.url });
+  entries.push({
+    root,
+    path: resourcePath,
+    url: entry.url,
+    packId: metadata.packId,
+    references: entry.references ?? [],
+  });
 }
 
 function resourcePathForEntry(entry) {
@@ -204,7 +223,83 @@ function resourcePathForEntry(entry) {
 function resourceMessageMatches(message, entry) {
   const normalizedMessage = String(message).replace(/\\/g, "/").toLowerCase();
   const normalizedPath = entry.path.toLowerCase();
-  return normalizedMessage.includes(normalizedPath) || normalizedMessage.includes(fileName(normalizedPath));
+  if (normalizedMessage.includes(normalizedPath) || normalizedMessage.includes(fileName(normalizedPath))) {
+    return true;
+  }
+
+  return referencePatterns(entry).some((pattern) => {
+    return normalizedMessage.includes(pattern) || wildcardToRegExp(pattern).test(normalizedMessage);
+  }) || referenceDatumPairs(entry).some((pair) => {
+    return normalizedMessage.includes(pair.sourceDatum) && normalizedMessage.includes(pair.targetDatum);
+  });
+}
+
+function matchingResourceEntries(message, candidates) {
+  const directMatches = candidates.filter((entry) => resourceMessageMatches(message, entry));
+  if (directMatches.length === 0) return [];
+
+  const entries = new Map();
+  for (const match of directMatches) {
+    entries.set(entryKey(match), match);
+
+    for (const candidate of relatedResourceEntries(match, candidates)) {
+      entries.set(entryKey(candidate), candidate);
+    }
+  }
+
+  return [...entries.values()];
+}
+
+function relatedResourceEntries(match, candidates) {
+  const patterns = new Set(referencePatterns(match));
+  const catalogs = new Set(referenceCatalogs(match));
+  if (patterns.size === 0 && catalogs.size === 0) return [];
+
+  return candidates.filter((candidate) => {
+    if (candidate.root !== match.root || candidate.packId !== match.packId) return false;
+    return (
+      referencePatterns(candidate).some((pattern) => patterns.has(pattern)) ||
+      referenceCatalogs(candidate).some((catalog) => catalogs.has(catalog))
+    );
+  });
+}
+
+function referencePatterns(entry) {
+  return (entry.references ?? [])
+    .map((reference) => normalizeResourceText(reference?.normalizedPath ?? reference?.rawPath ?? ""))
+    .filter(Boolean);
+}
+
+function referenceDatumPairs(entry) {
+  return (entry.references ?? [])
+    .map((reference) => ({
+      sourceDatum: normalizeDatum(reference?.sourceDatum),
+      targetDatum: normalizeDatum(reference?.targetDatum),
+    }))
+    .filter((pair) => pair.sourceDatum && pair.targetDatum);
+}
+
+function referenceCatalogs(entry) {
+  return (entry.references ?? [])
+    .map((reference) => normalizeResourceText(reference?.catalog ?? ""))
+    .filter(Boolean);
+}
+
+function wildcardToRegExp(pattern) {
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\?/g, ".");
+  return new RegExp(escaped, "i");
+}
+
+function normalizeResourceText(value) {
+  return String(value).replace(/\\/g, "/").replace(/^\.?\//, "").toLowerCase();
+}
+
+function normalizeDatum(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function entryKey(entry) {
+  return `${entry.root}/${entry.path}`;
 }
 
 async function loadManifest() {

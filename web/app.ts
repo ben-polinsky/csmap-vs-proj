@@ -142,6 +142,7 @@ type LiveCompareClient = {
 declare global {
   interface Window {
     CSMAP_PROJ_REPORT?: Report;
+    CSMAP_PROJ_WORKER_VERSION?: string;
     CSMAP_PROJ_WASM_ASSET_BASE_URL?: string;
     CSMAP_PROJ_WASM_RUNTIME_URL?: string;
   }
@@ -149,6 +150,7 @@ declare global {
 
 const report = window.CSMAP_PROJ_REPORT;
 const nativeCompareUrl = "/api/compare";
+const fallbackCompareWorkerVersion = "wasm-browser-parity";
 const fallbackWasmAssetBaseUrl = "/wasm/";
 const fallbackWasmRuntimeUrl = "/wasm/compare-runtime.js";
 
@@ -756,7 +758,7 @@ function createLiveCompareClient(): LiveCompareClient {
     if (workerUnavailableReason) return undefined;
 
     try {
-      worker = new Worker(new URL("../compare-worker.js", import.meta.url), { type: "module" });
+      worker = new Worker(compareWorkerUrl(), { type: "module" });
     } catch (error) {
       workerUnavailableReason = errorMessage(error);
       return undefined;
@@ -837,6 +839,12 @@ function createLiveCompareClient(): LiveCompareClient {
   }
 
   return { compare };
+}
+
+function compareWorkerUrl(): URL {
+  const url = new URL("../compare-worker.js", import.meta.url);
+  url.searchParams.set("v", window.CSMAP_PROJ_WORKER_VERSION?.trim() || fallbackCompareWorkerVersion);
+  return url;
 }
 
 function compareWorkerOptions(): CompareWorkerOptions {
