@@ -1,0 +1,4 @@
+[submodule "vendor/csmap"]
+	path = vendor/csmap
+	url = ../csmap
+	ignore = dirty

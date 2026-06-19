@@ -1,0 +1,50 @@
+diff --git a/CsMapDev/Dictionaries/Compiler.mak b/CsMapDev/Dictionaries/Compiler.mak
+index 03f571b..87013fb 100644
+--- a/CsMapDev/Dictionaries/Compiler.mak
++++ b/CsMapDev/Dictionaries/Compiler.mak
+@@ -88,7 +88,7 @@ $(INT_DIR)/$(TRG_BASE).o : $(TRG_BASE).c
+ 	$(CC) $(LCL_C_FLG) -o $(INT_DIR)/$(TRG_BASE).o $(TRG_BASE).c
+ 
+ $(OUT_DIR)/$(TRG_BASE) : $(INT_DIR)/$(TRG_BASE).o $(LIB_DIR)/$(CSMAP_LIB_NAME).a
+-	gcc -I../Include -o $(OUT_DIR)/$(TRG_BASE) $(INT_DIR)/$(TRG_BASE).o $(LIB_DIR)/$(CSMAP_LIB_NAME).a -lm -lc -lgcc -lstdc++
++	$(CXX) -I../Include -o $(OUT_DIR)/$(TRG_BASE) $(INT_DIR)/$(TRG_BASE).o $(LIB_DIR)/$(CSMAP_LIB_NAME).a -lm -lc -lstdc++
+ 
+ $(DICTIONARIES) :: $(DICTIONARY_SRC)
+ 	$(OUT_DIR)/$(TRG_BASE) -b $(INCLUDE_TEST) $(DICTIONARY_SRC_DIR) $(DICTIONARY_TRG_DIR)
+diff --git a/CsMapDev/Source/CS_ansi.c b/CsMapDev/Source/CS_ansi.c
+index c7cba57..bde8674 100644
+--- a/CsMapDev/Source/CS_ansi.c
++++ b/CsMapDev/Source/CS_ansi.c
+@@ -38,6 +38,7 @@
+ #include <wchar.h>
+ #include <wctype.h>
+ #include <sys/stat.h>
++#include <unistd.h>
+ #if _RUN_TIME < _rt_UNIXPCC
+ #	include <io.h>
+ #	include <float.h>
+diff --git a/CsMapDev/Source/CS_supprt.c b/CsMapDev/Source/CS_supprt.c
+index 06617f3..84348f3 100644
+--- a/CsMapDev/Source/CS_supprt.c
++++ b/CsMapDev/Source/CS_supprt.c
+@@ -29,6 +29,7 @@
+ 
+ #include "cs_map.h"
+ //#include <ctype.h>
++#include <wchar.h>
+ 
+ #if ( _OPR_SYSTEM == _os_UNIX )
+ # define _cdecl
+diff --git a/CsMapDev/TestCpp/TestCpp.mak b/CsMapDev/TestCpp/TestCpp.mak
+index 4f46421..5c2ac6f 100644
+--- a/CsMapDev/TestCpp/TestCpp.mak
++++ b/CsMapDev/TestCpp/TestCpp.mak
+@@ -69,7 +69,7 @@ $(INT_DIR)/$(TRG_NAME).o : Source/$(TRG_NAME).cpp
+ 	$(CXX) $(LCL_CXX_FLG) -o $(INT_DIR)/$(TRG_NAME).o Source/$(TRG_NAME).cpp
+ 
+ $(OUT_DIR)/$(TRG_BASE) : $(INT_DIR)/$(TRG_BASE).o $(LIB_DIR)/$(LIB_NAME).a $(LIB_DIR)/$(CSMAP_LIB_NAME).a
+-	$(CXX) -o $(OUT_DIR)/$(TRG_BASE) $(INT_DIR)/$(TRG_BASE).o $(LIB_DIR)/$(LIB_NAME).a $(LIB_DIR)/$(CSMAP_LIB_NAME).a -lm -lc -lgcc -lstdc++
++	$(CXX) -o $(OUT_DIR)/$(TRG_BASE) $(INT_DIR)/$(TRG_BASE).o $(LIB_DIR)/$(LIB_NAME).a $(LIB_DIR)/$(CSMAP_LIB_NAME).a -lm -lc -lstdc++
+ 
+ $(LIB_DIR)/$(LIB_NAME).a :
+ 	$(MAKE) -e -C ./Source -f TestCppLib.mak

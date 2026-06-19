@@ -1,0 +1,16 @@
+{
+  "name": "csmap-vs-proj",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "build": "npm run build:web && npm run build:server",
+    "build:web": "tsc -p tsconfig.web.json",
+    "build:server": "tsc -p tsconfig.server.json",
+    "serve": "node dist/server/server.js"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.3",
+    "typescript": "^5.8.3"
+  }
+}

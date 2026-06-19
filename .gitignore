@@ -1,0 +1,21 @@
+.DS_Store
+bin/
+*.o
+web/report.js
+web/dist/
+dist/
+node_modules/
+.cache/
+build/
+
+vendor/csmap/CsMapDev/bin47/
+vendor/csmap/CsMapDev/lib47/
+vendor/csmap/CsMapDev/obj47/
+vendor/csmap/CsMapDev/Dictionaries/*.CSD
+
+# Browser-native build outputs and lazily served data artifacts.
+wasm/build/
+wasm/dist/
+wasm/vendor/
+web/wasm/
+web/wasm-data/

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CS-MAP vs PROJ</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="identity">
+        <p class="eyebrow">coordinate reference audit</p>
+        <h1>CS-MAP vs PROJ</h1>
+        <p class="runline" id="runline">loading report</p>
+      </div>
+      <section class="metrics" aria-label="Comparison summary">
+        <div class="metric">
+          <span class="metric-value" id="metric-differences">0</span>
+          <span class="metric-label">differing cases</span>
+        </div>
+        <div class="metric">
+          <span class="metric-value" id="metric-failures">0</span>
+          <span class="metric-label">failed transforms</span>
+        </div>
+        <div class="metric">
+          <span class="metric-value" id="metric-assertions">0</span>
+          <span class="metric-label">checks run</span>
+        </div>
+      </section>
+    </header>
+
+    <main class="layout">
+      <aside class="controls" aria-label="Filters">
+        <div class="control-block">
+          <div class="control-label">View</div>
+          <div class="segmented" role="group" aria-label="Case filter">
+            <button class="segment active" type="button" data-filter="differences">Differing cases</button>
+            <button class="segment" type="button" data-filter="extents">Extent bboxes</button>
+            <button class="segment" type="button" data-filter="coordinates">Coordinate transforms</button>
+            <button class="segment" type="button" data-filter="all">All checks</button>
+          </div>
+        </div>
+        <div class="control-block">
+          <label class="control-label" for="search">Search</label>
+          <input id="search" class="search" type="search" autocomplete="off" />
+        </div>
+        <div class="legend" aria-label="Legend">
+          <div><span class="swatch land"></span>approximate land context</div>
+          <div><span class="swatch csmap"></span>CS-MAP extent bbox</div>
+          <div><span class="swatch proj"></span>PROJ extent bbox</div>
+          <div><span class="swatch delta"></span>bbox edge delta, deg</div>
+        </div>
+      </aside>
+
+      <section class="workspace">
+        <section class="live-panel" aria-label="Live CRS comparison">
+          <div class="live-header">
+            <div>
+              <p class="case-kicker">live transform</p>
+              <h2 class="live-title">Compare any two CRS</h2>
+            </div>
+            <button class="run-button" id="run-live" type="button">Run</button>
+          </div>
+          <div class="live-grid">
+            <label class="epsg-field">
+              <span>Source EPSG</span>
+              <input id="source-epsg" list="epsg-options" autocomplete="off" />
+            </label>
+            <label>
+              <span>Source CS-MAP</span>
+              <input id="source-csmap" list="crs-options" autocomplete="off" />
+            </label>
+            <label>
+              <span>Source PROJ</span>
+              <input id="source-proj" autocomplete="off" />
+            </label>
+            <label class="epsg-field">
+              <span>Target EPSG</span>
+              <input id="target-epsg" list="epsg-options" autocomplete="off" />
+            </label>
+            <label>
+              <span>Target CS-MAP</span>
+              <input id="target-csmap" list="crs-options" autocomplete="off" />
+            </label>
+            <label>
+              <span>Target PROJ</span>
+              <input id="target-proj" autocomplete="off" />
+            </label>
+            <label class="coordinate-field">
+              <span id="input-x-label">Input X, source units</span>
+              <input id="input-x" type="number" step="any" />
+            </label>
+            <label class="coordinate-field">
+              <span id="input-y-label">Input Y, source units</span>
+              <input id="input-y" type="number" step="any" />
+            </label>
+          </div>
+          <datalist id="crs-options"></datalist>
+          <datalist id="epsg-options"></datalist>
+          <section class="live-result" id="live-result" aria-live="polite"></section>
+        </section>
+        <section class="summary-band" id="summary-band" aria-label="High-level findings"></section>
+        <section class="case-list" id="case-list" aria-label="Comparison cases"></section>
+      </section>
+    </main>
+
+    <script src="report.js"></script>
+    <script type="module" src="dist/app.js"></script>
+  </body>
+</html>
