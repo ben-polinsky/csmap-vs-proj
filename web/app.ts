@@ -92,15 +92,65 @@ type LiveCompareResult = {
     exitCode?: number;
     stderr?: string;
   };
+  runtime?: {
+    source: "wasm" | "native";
+    fallbackReason?: string;
+    runtimeUrl?: string;
+  };
+};
+
+type CompareRequest = {
+  sourceEpsg?: string;
+  targetEpsg?: string;
+  sourceCsmap: string;
+  targetCsmap: string;
+  sourceProj: string;
+  targetProj: string;
+  x: number;
+  y: number;
+};
+
+type CompareWorkerOptions = {
+  nativeCompareUrl: string;
+  wasmAssetBaseUrl: string;
+  wasmRuntimeUrl: string;
+};
+
+type CompareWorkerMessage = {
+  id: number;
+  type: "compare";
+  options: CompareWorkerOptions;
+  request: CompareRequest;
+};
+
+type CompareWorkerResponse =
+  | {
+      id: number;
+      type: "result";
+      result: LiveCompareResult;
+    }
+  | {
+      id: number;
+      type: "error";
+      error: string;
+    };
+
+type LiveCompareClient = {
+  compare(request: CompareRequest): Promise<LiveCompareResult>;
 };
 
 declare global {
   interface Window {
     CSMAP_PROJ_REPORT?: Report;
+    CSMAP_PROJ_WASM_ASSET_BASE_URL?: string;
+    CSMAP_PROJ_WASM_RUNTIME_URL?: string;
   }
 }
 
 const report = window.CSMAP_PROJ_REPORT;
+const nativeCompareUrl = "/api/compare";
+const fallbackWasmAssetBaseUrl = "/wasm/";
+const fallbackWasmRuntimeUrl = "/wasm/compare-runtime.js";
 
 const state = {
   filter: "differences",
@@ -134,6 +184,8 @@ const elements = {
   liveResult: must<HTMLElement>("#live-result"),
   runLive: must<HTMLButtonElement>("#run-live"),
 };
+
+const liveCompareClient = createLiveCompareClient();
 
 function must<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -680,30 +732,175 @@ function controlsForRole(role: "source" | "target"): {
     : { epsg: elements.targetEpsg, csmap: elements.targetCsmap, proj: elements.targetProj };
 }
 
+function createLiveCompareClient(): LiveCompareClient {
+  if (!("Worker" in window)) {
+    return {
+      compare: (request) => fetchNativeCompare(request, "Web Workers are not available in this browser"),
+    };
+  }
+
+  let worker: Worker | undefined;
+  let workerUnavailableReason: string | undefined;
+  let nextRequestId = 1;
+  const pending = new Map<
+    number,
+    {
+      reject: (error: Error) => void;
+      resolve: (result: LiveCompareResult) => void;
+      timeoutId: number;
+    }
+  >();
+
+  function getWorker(): Worker | undefined {
+    if (worker) return worker;
+    if (workerUnavailableReason) return undefined;
+
+    try {
+      worker = new Worker(new URL("../compare-worker.js", import.meta.url), { type: "module" });
+    } catch (error) {
+      workerUnavailableReason = errorMessage(error);
+      return undefined;
+    }
+
+    worker.addEventListener("message", (event: MessageEvent<CompareWorkerResponse>) => {
+      const message = event.data;
+      if (!isCompareWorkerResponse(message)) return;
+
+      const active = pending.get(message.id);
+      if (!active) return;
+
+      window.clearTimeout(active.timeoutId);
+      pending.delete(message.id);
+      if (message.type === "result") {
+        active.resolve(message.result);
+      } else {
+        active.reject(new Error(message.error));
+      }
+    });
+
+    worker.addEventListener("error", () => {
+      workerUnavailableReason = "compare worker failed";
+      rejectPending(workerUnavailableReason);
+      worker?.terminate();
+      worker = undefined;
+    });
+
+    return worker;
+  }
+
+  async function compare(request: CompareRequest): Promise<LiveCompareResult> {
+    const activeWorker = getWorker();
+    if (!activeWorker) {
+      return fetchNativeCompare(request, workerUnavailableReason ?? "compare worker is unavailable");
+    }
+
+    try {
+      return await postWorkerCompare(activeWorker, request);
+    } catch (error) {
+      return fetchNativeCompare(request, `compare worker failed: ${errorMessage(error)}`);
+    }
+  }
+
+  function postWorkerCompare(activeWorker: Worker, request: CompareRequest): Promise<LiveCompareResult> {
+    return new Promise((resolve, reject) => {
+      const id = nextRequestId;
+      nextRequestId += 1;
+
+      const timeoutId = window.setTimeout(() => {
+        pending.delete(id);
+        reject(new Error("compare worker timed out"));
+      }, 30000);
+
+      pending.set(id, { reject, resolve, timeoutId });
+
+      try {
+        activeWorker.postMessage({
+          id,
+          type: "compare",
+          options: compareWorkerOptions(),
+          request,
+        } satisfies CompareWorkerMessage);
+      } catch (error) {
+        window.clearTimeout(timeoutId);
+        pending.delete(id);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
+    });
+  }
+
+  function rejectPending(reason: string): void {
+    for (const active of pending.values()) {
+      window.clearTimeout(active.timeoutId);
+      active.reject(new Error(reason));
+    }
+    pending.clear();
+  }
+
+  return { compare };
+}
+
+function compareWorkerOptions(): CompareWorkerOptions {
+  return {
+    nativeCompareUrl,
+    wasmAssetBaseUrl: normalizeAssetBaseUrl(window.CSMAP_PROJ_WASM_ASSET_BASE_URL),
+    wasmRuntimeUrl: window.CSMAP_PROJ_WASM_RUNTIME_URL?.trim() || fallbackWasmRuntimeUrl,
+  };
+}
+
+function normalizeAssetBaseUrl(value: string | undefined): string {
+  const baseUrl = value?.trim() || fallbackWasmAssetBaseUrl;
+  return baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+}
+
+async function fetchNativeCompare(request: CompareRequest, fallbackReason?: string): Promise<LiveCompareResult> {
+  const response = await fetch(nativeCompareUrl, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || `comparison failed with HTTP ${response.status}`);
+
+  return {
+    ...(data as LiveCompareResult),
+    runtime: {
+      source: "native",
+      fallbackReason,
+    },
+  };
+}
+
+function isCompareWorkerResponse(value: unknown): value is CompareWorkerResponse {
+  if (!value || typeof value !== "object") return false;
+
+  const record = value as Record<string, unknown>;
+  return typeof record.id === "number" && (record.type === "result" || record.type === "error");
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function buildCompareRequest(): CompareRequest {
+  return {
+    sourceEpsg: epsgDisplay(elements.sourceEpsg.value),
+    targetEpsg: epsgDisplay(elements.targetEpsg.value),
+    sourceCsmap: elements.sourceCsmap.value,
+    targetCsmap: elements.targetCsmap.value,
+    sourceProj: elements.sourceProj.value,
+    targetProj: elements.targetProj.value,
+    x: Number(elements.inputX.value),
+    y: Number(elements.inputY.value),
+  };
+}
+
 async function runLiveComparison(): Promise<void> {
   elements.runLive.disabled = true;
   elements.runLive.textContent = "Running";
   elements.liveResult.innerHTML = `<div class="live-empty">Running comparison</div>`;
 
   try {
-    const response = await fetch("/api/compare", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        sourceEpsg: epsgDisplay(elements.sourceEpsg.value),
-        targetEpsg: epsgDisplay(elements.targetEpsg.value),
-        sourceCsmap: elements.sourceCsmap.value,
-        targetCsmap: elements.targetCsmap.value,
-        sourceProj: elements.sourceProj.value,
-        targetProj: elements.targetProj.value,
-        x: Number(elements.inputX.value),
-        y: Number(elements.inputY.value),
-      }),
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || `comparison failed with HTTP ${response.status}`);
-
-    renderLiveResult(data as LiveCompareResult);
+    renderLiveResult(await liveCompareClient.compare(buildCompareRequest()));
   } catch (error) {
     elements.liveResult.innerHTML = liveError(error instanceof Error ? error.message : String(error));
   } finally {
@@ -730,6 +927,7 @@ function renderLiveResult(result: LiveCompareResult): void {
         <span class="status ${cssStatusClass(status)}">${escapeHtml(statusLabel(status, "live"))}</span>
         <span class="status-note">${escapeHtml(liveStatusNote(status, result, outputUnit))}</span>
         <span class="case-route">PROJ ${escapeHtml(result.projVersion || "unknown")}</span>
+        ${runtimeBadge(result)}
       </div>
       <div class="coordinate-grid">
         ${engineCard("CS-MAP", result.csmap, outputUnit)}
@@ -749,6 +947,19 @@ function renderLiveResult(result: LiveCompareResult): void {
 function liveStatusNote(status: string, result: LiveCompareResult, outputUnit: string): string {
   if (status === "failed") return "At least one engine did not return a coordinate.";
   return `CS-MAP output minus PROJ output: ${fmtUnit(result.delta, outputUnit, 12)}.`;
+}
+
+function runtimeBadge(result: LiveCompareResult): string {
+  if (!result.runtime) return "";
+
+  const label =
+    result.runtime.source === "wasm"
+      ? "browser WASM"
+      : result.runtime.fallbackReason
+        ? `native fallback: ${result.runtime.fallbackReason}`
+        : "native fallback";
+
+  return `<span class="case-route">${escapeHtml(label)}</span>`;
 }
 
 function engineCard(label: string, engine: LiveEngineResult | undefined, outputUnit: string): string {

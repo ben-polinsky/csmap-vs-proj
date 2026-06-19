@@ -19,9 +19,13 @@ if ! pkg-config --exists proj; then
   fi
 fi
 
-if [ ! -d "$CSMAP_REPO/.git" ]; then
+if [ ! -e "$CSMAP_REPO/.git" ]; then
   mkdir -p "$ROOT/vendor"
-  if [ -d "$ROOT/../csmap/.git" ]; then
+  if [ -d "$CSMAP_REPO" ] && [ -n "$(find "$CSMAP_REPO" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]; then
+    echo "$CSMAP_REPO exists but is not a Git checkout or initialized submodule." >&2
+    echo "Run: git -c protocol.file.allow=always submodule update --init vendor/csmap" >&2
+    exit 1
+  elif [ -d "$ROOT/../csmap/.git" ]; then
     git clone "$ROOT/../csmap" "$CSMAP_REPO"
   else
     git clone https://github.com/eharris/csmap "$CSMAP_REPO"

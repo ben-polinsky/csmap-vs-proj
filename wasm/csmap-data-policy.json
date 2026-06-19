@@ -1,0 +1,262 @@
+{
+  "schemaVersion": 1,
+  "sourceDictionaryDir": "vendor/csmap/CsMapDev/Dictionaries",
+  "assetDir": "web/wasm-data",
+  "assetMountPath": "/wasm-data",
+  "manifestFile": "manifest.json",
+  "csmap": {
+    "assetSubdir": "csmap",
+    "coreSubdir": "core",
+    "lazySubdir": "lazy"
+  },
+  "preload": {
+    "sourceDictionaries": [
+      "coordsys.asc",
+      "datums.asc",
+      "elipsoid.asc",
+      "category.asc",
+      "GeodeticTransformation.asc",
+      "GeodeticPath.asc"
+    ],
+    "compiledDictionaries": [
+      "Coordsys.CSD",
+      "Datums.CSD",
+      "Elipsoid.CSD",
+      "Category.CSD",
+      "GeodeticTransform.CSD",
+      "GeodeticPath.CSD"
+    ],
+    "catalogs": [
+      "NameMapper.csv",
+      "GeoidHeight.gdc",
+      "Vertcon.gdc",
+      "version.txt",
+      "license.txt"
+    ]
+  },
+  "gridExtensions": [
+    ".94",
+    ".b",
+    ".bin",
+    ".geo",
+    ".grd",
+    ".gsb",
+    ".las",
+    ".los",
+    ".par",
+    "._02",
+    "._nt",
+    "._par"
+  ],
+  "knownTextGridFiles": [
+    "France/gr3df97a.txt",
+    "OSGM91.TXT",
+    "OSTN02.txt",
+    "OSTN97.TXT"
+  ],
+  "additionalLazyFiles": [
+    {
+      "path": "OSTN02.txt",
+      "pack": "uk-ostn-osgm",
+      "reason": "CS-MAP OSTN02 projection support opens this file directly."
+    },
+    {
+      "path": "OSTN02._02",
+      "pack": "uk-ostn-osgm",
+      "reason": "CS-MAP OSTN02 projection support opens the generated binary cache when present."
+    },
+    {
+      "path": "OSTN97.TXT",
+      "pack": "uk-ostn-osgm",
+      "reason": "CS-MAP OSTN97 projection support opens this file directly."
+    },
+    {
+      "path": "OSTN97._nt",
+      "pack": "uk-ostn-osgm",
+      "reason": "CS-MAP OSTN97 projection support opens the generated binary cache when present."
+    },
+    {
+      "path": "OSGM91.TXT",
+      "pack": "uk-ostn-osgm",
+      "reason": "Referenced by geoid-height support as a UK OSGM91 text grid."
+    },
+    {
+      "path": "WW15MGH.GRD",
+      "pack": "world-geoid-height",
+      "reason": "Optional global EGM96 geoid grid listed by the geoid-height catalog."
+    },
+    {
+      "path": "Japan/TKY2JGD._par",
+      "pack": "japan-tky2jgd",
+      "reason": "CS-MAP Japan grid support opens the generated binary cache when present."
+    }
+  ],
+  "lazyGridPacks": [
+    {
+      "id": "us-harn",
+      "label": "US HARN NADCON grids",
+      "description": "State and regional high-accuracy NAD83/HARN LAS/LOS grids.",
+      "rules": {
+        "prefixes": ["Usa/Harn/"]
+      }
+    },
+    {
+      "id": "us-nadcon",
+      "label": "US NADCON grids",
+      "description": "NAD27/NAD83 NADCON LAS/LOS grids for CONUS, Alaska, Hawaii, and island areas.",
+      "rules": {
+        "prefixes": ["Usa/Nadcon/"]
+      }
+    },
+    {
+      "id": "us-nsrs2007-geocon",
+      "label": "US NSRS2007 GEOCON grids",
+      "description": "GEOCON binary grids used for NAD83/HARN to NSRS2007 transforms.",
+      "rules": {
+        "prefixes": ["Usa/NSRS2007/"]
+      }
+    },
+    {
+      "id": "us-nsrs2011-geocon",
+      "label": "US NSRS2011 GEOCON grids",
+      "description": "GEOCON binary grids used for NSRS2007 to NSRS2011 transforms.",
+      "rules": {
+        "prefixes": ["Usa/NSRS2011/"]
+      }
+    },
+    {
+      "id": "us-geoid-height",
+      "label": "US geoid-height grids",
+      "description": "US GEOID96, GEOID99, and GEOID03 height grids.",
+      "rules": {
+        "prefixes": ["Usa/Geoid96/", "Usa/Geoid99/", "Usa/Geoid03/"]
+      }
+    },
+    {
+      "id": "us-vertcon",
+      "label": "US VERTCON grids",
+      "description": "US vertical datum conversion files listed by Vertcon.gdc.",
+      "rules": {
+        "prefixes": ["Usa/Vertcon/"]
+      }
+    },
+    {
+      "id": "uk-ostn-osgm",
+      "label": "UK OSTN and OSGM grids",
+      "description": "UK OSTN/OSGM grids used by direct projection support and grid-interpolation transforms.",
+      "rules": {
+        "prefixes": ["UK/"],
+        "files": ["OSTN02.txt", "OSTN02._02", "OSTN97.TXT", "OSTN97._nt", "OSGM91.TXT"]
+      }
+    },
+    {
+      "id": "australia-grid-shifts",
+      "label": "Australia grid shifts",
+      "description": "Australian AGD66/AGD84 NTv2 grids.",
+      "rules": {
+        "prefixes": ["Australia/"]
+      }
+    },
+    {
+      "id": "portugal-grid-shifts",
+      "label": "Portugal grid shifts",
+      "description": "Portugal Datum 73, Lisbon, and related NTv2 grids.",
+      "rules": {
+        "prefixes": ["Portugal/"]
+      }
+    },
+    {
+      "id": "spain-grid-shifts",
+      "label": "Spain grid shifts",
+      "description": "Spain ED50/ETRS89 grid shift files.",
+      "rules": {
+        "prefixes": ["Spain/"]
+      }
+    },
+    {
+      "id": "france-grid-shifts",
+      "label": "France grid shifts",
+      "description": "French RGF/NTF grid files.",
+      "rules": {
+        "prefixes": ["France/"]
+      }
+    },
+    {
+      "id": "germany-grid-shifts",
+      "label": "Germany grid shifts",
+      "description": "Germany BeTA2007 grid files.",
+      "rules": {
+        "prefixes": ["Germany/"]
+      }
+    },
+    {
+      "id": "switzerland-grid-shifts",
+      "label": "Switzerland grid shifts",
+      "description": "Swiss CHENyx grid files.",
+      "rules": {
+        "prefixes": ["Switzerland/"]
+      }
+    },
+    {
+      "id": "japan-tky2jgd",
+      "label": "Japan TKY2JGD grids",
+      "description": "Japanese TKY2JGD text and binary-cache grid files.",
+      "rules": {
+        "prefixes": ["Japan/"]
+      }
+    },
+    {
+      "id": "new-zealand-grid-shifts",
+      "label": "New Zealand grid shifts",
+      "description": "New Zealand NZGD49/NZGD2000 grid files.",
+      "rules": {
+        "prefixes": ["NewZealand/"]
+      }
+    },
+    {
+      "id": "brazil-grid-shifts",
+      "label": "Brazil grid shifts",
+      "description": "Brazil NTv2 grid files present in the CS-MAP dictionary tree.",
+      "rules": {
+        "prefixes": ["Brazil/"]
+      }
+    },
+    {
+      "id": "venezuela-grid-shifts",
+      "label": "Venezuela grid shifts",
+      "description": "Venezuela NTv2 grid files present in the CS-MAP dictionary tree.",
+      "rules": {
+        "prefixes": ["Venezuela/"]
+      }
+    },
+    {
+      "id": "world-geoid-height",
+      "label": "World geoid-height grids",
+      "description": "Global geoid-height grids that can be enabled by catalog policy.",
+      "rules": {
+        "files": ["WW15MGH.GRD"]
+      }
+    },
+    {
+      "id": "misc-grid-files",
+      "label": "Other CS-MAP grid files",
+      "description": "Grid-like files discovered in the dictionary tree that are not covered by a narrower pack.",
+      "rules": {
+        "extensions": [
+          ".94",
+          ".b",
+          ".bin",
+          ".geo",
+          ".grd",
+          ".gsb",
+          ".las",
+          ".los",
+          ".par",
+          "._02",
+          "._nt",
+          "._par"
+        ]
+      }
+    }
+  ]
+}
