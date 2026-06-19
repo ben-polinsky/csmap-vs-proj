@@ -38,17 +38,26 @@ let crsCache: Promise<CsrEntry[]> | undefined;
 
 const contentTypes: Record<string, string> = {
   ".css": "text/css; charset=utf-8",
+  ".data": "application/octet-stream",
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".map": "application/json; charset=utf-8",
+  ".mjs": "text/javascript; charset=utf-8",
   ".png": "image/png",
   ".svg": "image/svg+xml",
+  ".wasm": "application/wasm",
+};
+
+const isolationHeaders: Record<string, string> = {
+  "Cross-Origin-Embedder-Policy": "require-corp",
+  "Cross-Origin-Opener-Policy": "same-origin",
 };
 
 function sendJson(response: ServerResponse, status: number, body: unknown): void {
   const payload = JSON.stringify(body);
   response.writeHead(status, {
+    ...isolationHeaders,
     "content-type": "application/json; charset=utf-8",
     "content-length": Buffer.byteLength(payload),
   });
@@ -57,6 +66,7 @@ function sendJson(response: ServerResponse, status: number, body: unknown): void
 
 function sendText(response: ServerResponse, status: number, body: string): void {
   response.writeHead(status, {
+    ...isolationHeaders,
     "content-type": "text/plain; charset=utf-8",
     "content-length": Buffer.byteLength(body),
   });
@@ -377,6 +387,8 @@ async function serveStaticFrom(response: ServerResponse, baseDir: string, routeP
   try {
     const body = await fs.readFile(filePath);
     response.writeHead(200, {
+      ...isolationHeaders,
+      "cache-control": "no-store",
       "content-type": contentTypes[path.extname(filePath)] ?? "application/octet-stream",
       "content-length": body.byteLength,
     });

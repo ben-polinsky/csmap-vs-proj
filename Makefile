@@ -8,6 +8,14 @@ CSMAP_SENTINEL := $(CSMAP_DICT)/Coordsys.CSD
 WEB_DIR := web
 REPORT_JS := $(WEB_DIR)/report.js
 LIVE_COMPARE := bin/live_compare
+COMPARE_CORE := src/compare_core.cpp
+
+WASM_DIR ?= wasm
+WASM_BUILD_DIR ?= $(WASM_DIR)/build
+WASM_VENDOR_DIR ?= $(WASM_DIR)/vendor
+WASM_DIST_DIR ?= $(WASM_DIR)/dist
+WASM_DATA_DIR ?= $(WEB_DIR)/wasm-data
+PROJ_WASM_VERSION ?= 9.8.1
 
 PROJ_CFLAGS := $(shell pkg-config --cflags proj)
 PROJ_LIBS := $(shell pkg-config --libs proj)
@@ -16,7 +24,7 @@ CXXFLAGS ?= -std=c++17 -O2 -Wall -Wextra -pedantic -Wno-invalid-utf8
 CPPFLAGS += -I$(CSMAP_DEV)/Include $(PROJ_CFLAGS)
 LDLIBS += $(CSMAP_LIB) $(PROJ_LIBS) -lm
 
-.PHONY: all bootstrap csmap csmap-test run test app serve clean proj-smoke ts-build
+.PHONY: all bootstrap csmap csmap-test run test app serve clean proj-smoke ts-build wasm-toolchain-check wasm-data wasm wasm-test
 
 all: bin/compare bin/parity_tests $(LIVE_COMPARE)
 
@@ -40,8 +48,8 @@ bin/compare: src/compare.cpp $(CSMAP_LIB) $(CSMAP_SENTINEL) | bin
 bin/parity_tests: src/parity_tests.cpp $(CSMAP_LIB) $(CSMAP_SENTINEL) | bin
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $@ src/parity_tests.cpp $(LDLIBS)
 
-$(LIVE_COMPARE): src/live_compare.cpp $(CSMAP_LIB) $(CSMAP_SENTINEL) | bin
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $@ src/live_compare.cpp $(LDLIBS)
+$(LIVE_COMPARE): src/live_compare.cpp $(COMPARE_CORE) src/compare_core.hpp $(CSMAP_LIB) $(CSMAP_SENTINEL) | bin
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $@ src/live_compare.cpp $(COMPARE_CORE) $(LDLIBS)
 
 bin:
 	mkdir -p bin
@@ -58,7 +66,7 @@ node_modules/.package-lock.json: package.json
 ts-build: node_modules/.package-lock.json
 	npm run build
 
-app: $(REPORT_JS) $(LIVE_COMPARE) ts-build
+app: $(REPORT_JS) $(LIVE_COMPARE) wasm-data ts-build
 
 $(REPORT_JS): bin/parity_tests | $(WEB_DIR)
 	./bin/parity_tests --csmap-dict $(CSMAP_DICT) --report-js $(REPORT_JS)
@@ -69,5 +77,19 @@ $(WEB_DIR):
 serve: app
 	PORT=4173 HOST=127.0.0.1 npm run serve
 
+wasm-toolchain-check:
+	./scripts/wasm-toolchain-check.sh
+
+wasm-data: csmap
+	CSMAP_DICT=$(CSMAP_DICT) WASM_DATA_DIR=$(WASM_DATA_DIR) ./scripts/wasm-data.sh
+
+wasm: wasm-toolchain-check wasm-data
+	PROJ_VERSION=$(PROJ_WASM_VERSION) WASM_DIR=$(WASM_DIR) WASM_BUILD_DIR=$(WASM_BUILD_DIR) WASM_VENDOR_DIR=$(WASM_VENDOR_DIR) ./scripts/build-wasm-proj.sh
+	CSMAP_DEV=$(CSMAP_DEV) WASM_DIR=$(WASM_DIR) WASM_BUILD_DIR=$(WASM_BUILD_DIR) ./scripts/build-wasm-csmap.sh
+	WASM_DIR=$(WASM_DIR) WASM_BUILD_DIR=$(WASM_BUILD_DIR) WASM_DATA_DIR=$(WASM_DATA_DIR) ./scripts/build-wasm-runtime.sh
+
+wasm-test: wasm
+	PROJ_VERSION=$(PROJ_WASM_VERSION) WASM_DIR=$(WASM_DIR) WASM_BUILD_DIR=$(WASM_BUILD_DIR) WASM_VENDOR_DIR=$(WASM_VENDOR_DIR) WASM_DATA_DIR=$(WASM_DATA_DIR) ./scripts/wasm-test.sh
+
 clean:
-	rm -rf bin $(REPORT_JS) dist $(WEB_DIR)/dist
+	rm -rf bin $(REPORT_JS) dist $(WEB_DIR)/dist $(WEB_DIR)/wasm
