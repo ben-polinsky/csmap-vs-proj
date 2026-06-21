@@ -1,4 +1,4 @@
 [submodule "vendor/csmap"]
 	path = vendor/csmap
-	url = ../csmap
+	url = https://github.com/eharris/csmap.git
 	ignore = dirty

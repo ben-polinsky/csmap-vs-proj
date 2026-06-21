@@ -2,9 +2,11 @@ CXX = clang++
 CC = clang
 
 CSMAP_DEV ?= vendor/csmap/CsMapDev
+CSMAP_REPO ?= vendor/csmap
 CSMAP_DICT ?= $(CSMAP_DEV)/Dictionaries
 CSMAP_LIB := $(CSMAP_DEV)/lib47/Linux64/CsMap.a
 CSMAP_SENTINEL := $(CSMAP_DICT)/Coordsys.CSD
+CSMAP_PATCH := patches/csmap-macos-clang.patch
 WEB_DIR := web
 REPORT_JS := $(WEB_DIR)/report.js
 LIVE_COMPARE := bin/live_compare
@@ -24,22 +26,33 @@ CXXFLAGS ?= -std=c++17 -O2 -Wall -Wextra -pedantic -Wno-invalid-utf8
 CPPFLAGS += -I$(CSMAP_DEV)/Include $(PROJ_CFLAGS)
 LDLIBS += $(CSMAP_LIB) $(PROJ_LIBS) -lm
 
-.PHONY: all bootstrap csmap csmap-test run test app serve clean proj-smoke ts-build wasm-toolchain-check wasm-data wasm wasm-test
+.PHONY: all bootstrap csmap csmap-patch csmap-test run test app serve clean proj-smoke ts-build wasm-toolchain-check wasm-data wasm wasm-test
 
 all: bin/compare bin/parity_tests $(LIVE_COMPARE)
 
 bootstrap:
 	./scripts/bootstrap.sh
 
-csmap: $(CSMAP_LIB) $(CSMAP_SENTINEL)
+csmap: csmap-patch $(CSMAP_LIB) $(CSMAP_SENTINEL)
 
-csmap-test:
+csmap-patch:
+	@test -d "$(CSMAP_DEV)" || (echo "CS-MAP submodule is missing. Run: git submodule update --init --recursive vendor/csmap" >&2; exit 1)
+	@if git -C "$(CSMAP_REPO)" apply --check --ignore-space-change "$(abspath $(CSMAP_PATCH))" >/dev/null 2>&1; then \
+		git -C "$(CSMAP_REPO)" apply --ignore-space-change "$(abspath $(CSMAP_PATCH))"; \
+	elif git -C "$(CSMAP_REPO)" apply --reverse --check --ignore-space-change "$(abspath $(CSMAP_PATCH))" >/dev/null 2>&1; then \
+		echo "CS-MAP patch already applied."; \
+	else \
+		echo "CS-MAP patch does not apply cleanly. Inspect $(CSMAP_PATCH) and $(CSMAP_REPO)." >&2; \
+		exit 1; \
+	fi
+
+csmap-test: csmap-patch
 	$(MAKE) -C $(CSMAP_DEV) -f CsMap.mak Linux64 QuickTest CC=$(CC) CXX=$(CXX)
 
 proj-smoke:
 	projinfo EPSG:3857 >/dev/null
 
-$(CSMAP_LIB) $(CSMAP_SENTINEL):
+$(CSMAP_LIB) $(CSMAP_SENTINEL): csmap-patch
 	$(MAKE) -C $(CSMAP_DEV) -f CsMap.mak Linux64 CC=$(CC) CXX=$(CXX)
 
 bin/compare: src/compare.cpp $(CSMAP_LIB) $(CSMAP_SENTINEL) | bin
@@ -57,11 +70,11 @@ bin:
 run: bin/compare proj-smoke
 	./bin/compare --csmap-dict $(CSMAP_DICT)
 
-test: csmap-test proj-smoke bin/parity_tests
+test: csmap-test proj-smoke bin/parity_tests app
 	./bin/parity_tests --csmap-dict $(CSMAP_DICT)
 
-node_modules/.package-lock.json: package.json
-	npm install
+node_modules/.package-lock.json: package.json package-lock.json
+	npm ci
 
 ts-build: node_modules/.package-lock.json
 	npm run build

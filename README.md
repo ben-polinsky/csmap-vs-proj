@@ -123,3 +123,17 @@ Browser smoke cases verified on this branch:
 ## Test plan
 
 See `docs/test-plan.md` for the current test strategy and the next comparison areas to add.
+
+## Deployment
+
+The live app needs a container or VM host because the TypeScript server shells out to a native CS-MAP/PROJ comparison binary. Static hosting and serverless function hosts are not a good fit for the current architecture.
+
+The prepared path is:
+
+```sh
+docker build -t csmap-vs-proj .
+docker run --rm -p 4173:4173 -e HOST=0.0.0.0 -e PORT=4173 csmap-vs-proj
+npm run smoke:deploy -- http://127.0.0.1:4173
+```
+
+Render can use `render.yaml` for a free web-service demo. Fly.io can use `fly.toml.example` as a low-cost Docker path, but it is not a strict free-tier target. See `docs/deployment-plan.md` for the host ranking, caveats, WASM-native static track, and remaining deployment checklist.

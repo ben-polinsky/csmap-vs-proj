@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: csmap-vs-proj
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: PROJ_DATA
+        value: /usr/share/proj
+      - key: PROJ_NETWORK
+        value: "OFF"
+      - key: COMPARE_CONCURRENCY
+        value: "2"
+      - key: COMPARE_QUEUE_LIMIT
+        value: "16"

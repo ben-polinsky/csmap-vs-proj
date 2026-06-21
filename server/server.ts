@@ -28,13 +28,26 @@ type CompareRequest = {
 };
 
 const rootDir = path.resolve(__dirname, "../..");
-const webDir = path.join(rootDir, "web");
-const leafletDir = path.join(rootDir, "node_modules/leaflet/dist");
-const csmapDictDir = path.join(rootDir, "vendor/csmap/CsMapDev/Dictionaries");
+const webDir = path.resolve(rootDir, process.env.WEB_DIR ?? "web");
+const leafletDir = path.resolve(rootDir, process.env.LEAFLET_DIR ?? "node_modules/leaflet/dist");
+const csmapDictDir = path.resolve(rootDir, process.env.CSMAP_DICT_DIR ?? "vendor/csmap/CsMapDev/Dictionaries");
 const coordsysPath = path.join(csmapDictDir, "coordsys.asc");
-const liveComparePath = path.join(rootDir, "bin/live_compare");
+const liveComparePath = path.resolve(rootDir, process.env.LIVE_COMPARE_PATH ?? "bin/live_compare");
+const compareConcurrency = positiveIntegerEnv("COMPARE_CONCURRENCY", 2);
+const compareQueueLimit = nonNegativeIntegerEnv("COMPARE_QUEUE_LIMIT", 16);
 
 let crsCache: Promise<CsrEntry[]> | undefined;
+let activeCompareCount = 0;
+const compareQueue: Array<() => void> = [];
+
+class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
 
 const contentTypes: Record<string, string> = {
   ".css": "text/css; charset=utf-8",
@@ -127,11 +140,49 @@ function normalizeEpsgToken(value: string): string | undefined {
   return code > 0 ? String(code) : undefined;
 }
 
+function positiveIntegerEnv(name: string, fallback: number): number {
+  const value = process.env[name];
+  if (!value) return fallback;
+
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function nonNegativeIntegerEnv(name: string, fallback: number): number {
+  const value = process.env[name];
+  if (!value) return fallback;
+
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
 function isDeprecatedCrs(entry: CsrEntry): boolean {
   return entry.group === "LEGACY" || /deprecated/i.test(entry.desc ?? "");
 }
 
 async function handleApi(request: IncomingMessage, response: ServerResponse, pathname: string): Promise<void> {
+  if (request.method === "GET" && pathname === "/api/health") {
+    const checks = {
+      webDir: await pathExists(webDir),
+      leaflet: await pathExists(path.join(leafletDir, "leaflet.js")),
+      coordsys: await pathExists(coordsysPath),
+      liveCompare: await pathExists(liveComparePath),
+    };
+    const ok = Object.values(checks).every(Boolean);
+    sendJson(response, ok ? 200 : 500, {
+      status: ok ? "ok" : "missing-runtime-artifact",
+      service: "csmap-vs-proj",
+      checks,
+      compare: {
+        concurrency: compareConcurrency,
+        active: activeCompareCount,
+        queued: compareQueue.length,
+        queueLimit: compareQueueLimit,
+      },
+    });
+    return;
+  }
+
   if (request.method === "GET" && pathname === "/api/crs") {
     const items = await readCrsEntries();
     sendJson(response, 200, { items });
@@ -142,10 +193,12 @@ async function handleApi(request: IncomingMessage, response: ServerResponse, pat
     try {
       const body = await readJsonBody(request);
       const compareRequest = await normalizeCompareRequest(body);
-      const result = await runNativeCompare(compareRequest);
+      const result = await withCompareSlot(() => runNativeCompare(compareRequest));
       sendJson(response, 200, result);
     } catch (error) {
-      sendJson(response, 400, { error: error instanceof Error ? error.message : String(error) });
+      sendJson(response, error instanceof ApiError ? error.status : 400, {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
     return;
   }
@@ -336,6 +389,36 @@ async function runNativeCompare(compareRequest: CompareRequest): Promise<unknown
   };
 }
 
+function withCompareSlot<T>(operation: () => Promise<T>): Promise<T> {
+  if (activeCompareCount < compareConcurrency) {
+    activeCompareCount += 1;
+    return runReservedCompareSlot(operation);
+  }
+
+  if (compareQueue.length >= compareQueueLimit) {
+    throw new ApiError(503, "comparison queue is full; retry shortly");
+  }
+
+  return new Promise((resolve, reject) => {
+    compareQueue.push(() => {
+      runReservedCompareSlot(operation).then(resolve, reject);
+    });
+  });
+}
+
+async function runReservedCompareSlot<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } finally {
+    const next = compareQueue.shift();
+    if (next) {
+      setImmediate(next);
+    } else {
+      activeCompareCount -= 1;
+    }
+  }
+}
+
 function execFileCapture(
   file: string,
   args: string[],
@@ -356,6 +439,15 @@ function parseNativeJson(stdout: string): unknown {
     return JSON.parse(stdout);
   } catch {
     return undefined;
+  }
+}
+
+async function pathExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
   }
 }
 
