@@ -7,7 +7,12 @@
     "build": "npm run build:web && npm run build:server",
     "build:web": "tsc -p tsconfig.web.json",
     "build:server": "tsc -p tsconfig.server.json",
-    "serve": "node dist/server/server.js"
+    "serve": "node dist/server/server.js",
+    "start": "node dist/server/server.js",
+    "smoke:deploy": "node scripts/deploy-smoke.js"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "devDependencies": {
     "@types/leaflet": "^1.9.21",
