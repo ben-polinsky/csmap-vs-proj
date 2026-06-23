@@ -1,0 +1,15 @@
+.DS_Store
+.git
+.cache
+build
+node_modules
+dist
+bin
+web/dist
+web/report.js
+wasm/build
+wasm/dist
+wasm/vendor
+web/wasm
+web/wasm-data
+vendor/csmap
