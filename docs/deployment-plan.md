@@ -57,6 +57,7 @@ Avoid as primary targets for the current app:
 1. Make CS-MAP fetch deterministic.
    - Current `.gitmodules` points `vendor/csmap` at `../csmap`, and the worktree submodule config points at a local absolute path. Hosted builders need either a public absolute URL or a build script that clones the intended CS-MAP source explicitly.
    - Implemented: `.gitmodules` now points to `https://github.com/eharris/csmap.git`, and the Dockerfile clones that repo at the recorded submodule commit.
+   - Implemented: `.gcloudignore` excludes the local vendored checkout and generated artifacts so Cloud Build uploads only source files; the Dockerfile still clones the pinned CS-MAP ref during the image build.
 
 2. Add a container build.
    - Start with a simple, reliable Dockerfile before optimizing image size.
@@ -132,10 +133,21 @@ Verified locally on 2026-06-19:
 - `docker build -t csmap-vs-proj .` passed; the Docker build runs `make test` inside the image.
 - `npm run smoke:deploy -- http://127.0.0.1:4173` passed against the built Docker container with the same `7836` CRS entries and `0` compare delta.
 
+Verified on Cloud Run on 2026-06-23:
+
+- Project: `csmap-vs-proj`
+- Region: `us-central1`
+- Service: `csmap-vs-proj`
+- Revision: `csmap-vs-proj-00001-bnj`
+- Image: `us-central1-docker.pkg.dev/csmap-vs-proj/csmap-vs-proj/csmap-vs-proj:ae597ac`
+- Public URL: `https://csmap-vs-proj-7ohnhfokpa-uc.a.run.app`
+- `npm run smoke:deploy -- https://csmap-vs-proj-7ohnhfokpa-uc.a.run.app` passed, reporting `CRS entries: 7836` and `EPSG:4326 -> EPSG:3857 delta: 0`.
+- Cloud Run settings: `512Mi` memory, `1` CPU, `min-instances=0`, `max-instances=1`, container concurrency `16`, and compare env vars `COMPARE_CONCURRENCY=2`, `COMPARE_QUEUE_LIMIT=16`.
+
 Not yet done:
 
-- No public cloud service has been created.
-- Cloud Run/Render/Koyeb runtime behavior still needs to be measured after first deploy: cold start, image size/build time, request latency, and free-tier concurrency settings.
+- Cold-start latency and sustained request latency should still be measured from a clean idle service.
+- Render/Koyeb runtime behavior has not been measured.
 
 ## WASM-Native Static Track
 
